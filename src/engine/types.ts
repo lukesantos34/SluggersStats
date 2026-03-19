@@ -36,4 +36,6 @@ export interface GameState {
   pitcherAway: string
 
   playerStats: Record<string, PlayerStats>
+
+  playLog: string[]
 }

@@ -26,6 +26,8 @@ export function applyPlay(
 
   const currentBatter = lineup[battingIndex]
 
+  const playDescription = `${currentBatter} - ${result}`
+
   const pitcher = isTop
     ? newState.pitcherHome
     : newState.pitcherAway
@@ -42,6 +44,7 @@ export function applyPlay(
     advanceBatterIndex(newState)
     checkInningChange(newState)
 
+    newState.playLog.push(playDescription)
     return newState
   }
 
@@ -50,6 +53,7 @@ export function applyPlay(
     advanceRunners(newState, 1)
     newState.bases.first = currentBatter
     advanceBatterIndex(newState)
+    newState.playLog.push(playDescription)
     return newState
   }
 
@@ -75,6 +79,7 @@ export function applyPlay(
   }
 
   advanceBatterIndex(newState)
+  newState.playLog.push(playDescription)
   return newState
 }
 
@@ -134,6 +139,7 @@ function scoreRun(state: GameState, player: string) {
   }
 
   state.playerStats[player].rbis += 1
+  state.playLog.push(`${player} scores a run`)
 }
 
 function checkInningChange(state: GameState) {

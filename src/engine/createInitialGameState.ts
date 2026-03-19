@@ -14,7 +14,7 @@ const homeLineup = [
 
 const awayLineup = [
   "birdo",
-  "rosalina",
+  "donkey_kong",
   "toadette",
   "boo",
   "waluigi",
@@ -71,5 +71,6 @@ export function createInitialGameState(): GameState {
 
     playerStats,
 
+    playLog: [],
   }
 }

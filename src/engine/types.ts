@@ -36,6 +36,4 @@ export interface GameState {
   pitcherAway: string
 
   playerStats: Record<string, PlayerStats>
-
-  history: GameState[] // For undo functionality
 }

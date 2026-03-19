@@ -15,9 +15,6 @@ export function applyPlay(
 ): GameState {
   const newState: GameState = JSON.parse(JSON.stringify(state))
 
-  // Save snapshot for undo
-  newState.history.push(state)
-
   const isTop = newState.inningSide === "top"
   const battingIndex = isTop
     ? newState.battingIndexAway

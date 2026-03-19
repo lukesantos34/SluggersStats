@@ -24,10 +24,26 @@ export default function App() {
     typeof gameState[]
   >([])
 
+  type PlayBuilder =
+    | { step: "root" }
+    | { step: "outType" }
+    | { step: "strikeoutType" }
+    | { step: "outLocation"; outKind: "groundout" | "lineout" | "flyout" | "popout" }
+
+
+  const [playBuilder, setPlayBuilder] = useState<PlayBuilder>({
+    step: "root",
+  })
+
   function handlePlay(result: PlayResult) {
     setHistory((prev) => [...prev, gameState])
     const newState = applyPlay(gameState, result)
     setGameState(newState)
+  }
+
+  function applyAndReset(result: PlayResult) {
+    handlePlay(result)
+    setPlayBuilder({ step: "root" })
   }
 
   function handleUndo() {
@@ -36,6 +52,10 @@ export default function App() {
     const previous = history[history.length - 1]
     setHistory((prev) => prev.slice(0, -1))
     setGameState(previous)
+  }
+
+  function finalizeStrikeout(kind: "looking" | "swinging") {
+    applyAndReset({ type: "strikeout", kind })
   }
 
   const isTop = gameState.inningSide === "top"
@@ -114,33 +134,140 @@ export default function App() {
         </div>
       </div>
 
-      {/* Bottom Controls */}
+    {/* Bottom Controls */}
+
+    {playBuilder.step === "root" && (
       <div className="grid grid-cols-3 gap-2 text-xs">
-        <button onClick={() => handlePlay("single")} className="bg-green-500 text-white rounded p-1">
+        <button
+          onClick={() => setPlayBuilder({ step: "outType" })}
+          className="bg-red-500 text-white rounded p-2 col-span-3"
+        >
+          OUT
+        </button>
+
+        <button
+          onClick={() => applyAndReset({ type: "single" })}
+          className="bg-green-500 text-white rounded p-2"
+        >
           1B
         </button>
-        <button onClick={() => handlePlay("double")} className="bg-green-600 text-white rounded p-1">
+
+        <button
+          onClick={() => applyAndReset({ type: "double" })}
+          className="bg-green-600 text-white rounded p-2"
+        >
           2B
         </button>
-        <button onClick={() => handlePlay("triple")} className="bg-green-700 text-white rounded p-1">
-          3B
-        </button>
-        <button onClick={() => handlePlay("homerun")} className="bg-green-800 text-white rounded p-1">
+
+        <button
+          onClick={() => applyAndReset({ type: "homerun" })}
+          className="bg-green-800 text-white rounded p-2"
+        >
           HR
         </button>
-        <button onClick={() => handlePlay("walk")} className="bg-blue-500 text-white rounded p-1">
+
+        <button
+          onClick={() => applyAndReset({ type: "triple" })}
+          className="bg-green-700 text-white rounded p-2"
+        >
+          3B
+        </button>
+
+        <button
+          onClick={() => applyAndReset({ type: "walk" })}
+          className="bg-blue-500 text-white rounded p-2"
+        >
           BB
         </button>
-        <button onClick={() => handlePlay("strikeout")} className="bg-red-500 text-white rounded p-1">
-          K
-        </button>
-        <button onClick={() => handlePlay("flyout")} className="bg-red-600 text-white rounded p-1 col-span-2">
-          Fly
-        </button>
-        <button onClick={handleUndo} className="bg-gray-700 text-white rounded p-1">
+
+        <button
+          onClick={handleUndo}
+          className="bg-gray-700 text-white rounded p-2 col-span-3"
+        >
           Undo
         </button>
       </div>
+    )}
+
+    {playBuilder.step === "outType" && (
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <button
+          onClick={() => setPlayBuilder({ step: "strikeoutType" })}
+          className="bg-red-600 text-white rounded p-2 col-span-2"
+        >
+          Strikeout
+        </button>
+
+        <button
+          onClick={() =>
+            setPlayBuilder({ step: "outLocation", outKind: "groundout" })
+          }
+          className="bg-red-500 text-white rounded p-2"
+        >
+          Groundout
+        </button>
+
+        <button
+          onClick={() =>
+            setPlayBuilder({ step: "outLocation", outKind: "lineout" })
+          }
+          className="bg-red-500 text-white rounded p-2"
+        >
+          Lineout
+        </button>
+
+        <button
+          onClick={() =>
+            setPlayBuilder({ step: "outLocation", outKind: "flyout" })
+          }
+          className="bg-red-500 text-white rounded p-2"
+        >
+          Flyout
+        </button>
+
+        <button
+          onClick={() =>
+            setPlayBuilder({ step: "outLocation", outKind: "popout" })
+          }
+          className="bg-red-500 text-white rounded p-2"
+        >
+          Popout
+        </button>
+
+        <button
+          onClick={() => setPlayBuilder({ step: "root" })}
+          className="bg-gray-700 text-white rounded p-2 col-span-2"
+        >
+          Back
+        </button>
+      </div>
+    )}    
+
+    {playBuilder.step === "strikeoutType" && (
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <button
+          onClick={() => finalizeStrikeout("looking")}
+          className="bg-red-600 text-white rounded p-2"
+        >
+          Looking
+        </button>
+
+        <button
+          onClick={() => finalizeStrikeout("swinging")}
+          className="bg-red-600 text-white rounded p-2"
+        >
+          Swinging
+        </button>
+
+        <button
+          onClick={() => setPlayBuilder({ step: "outType" })}
+          className="bg-gray-700 text-white rounded p-2 col-span-2"
+        >
+          Back
+        </button>
+      </div>
+    )}
+    
     </div>
   )
 }

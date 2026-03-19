@@ -1,13 +1,51 @@
 import type { GameState } from "./types"
 
 export type PlayResult =
-  | "single"
-  | "double"
-  | "triple"
-  | "homerun"
-  | "walk"
-  | "strikeout"
-  | "flyout"
+  | { type: "single" }
+  | { type: "double" }
+  | { type: "triple" }
+  | { type: "homerun" }
+  | { type: "walk" }
+  | { type: "strikeout"; kind: "looking" | "swinging" }
+  | { type: "groundout"; location: string }
+  | { type: "lineout"; location: string }
+  | { type: "flyout"; location: string }
+  | { type: "popout"; location: string }
+
+function buildPlayDescription(
+  batter: string,
+  result: PlayResult
+): string {
+  if (result.type === "single") return `${batter} singled.`
+  if (result.type === "double") return `${batter} doubled.`
+  if (result.type === "triple") return `${batter} tripled.`
+  if (result.type === "homerun") return `${batter} hit a home run.`
+  if (result.type === "walk") return `${batter} walked.`
+
+  if (result.type === "strikeout") {
+    return result.kind === "looking"
+      ? `${batter} struck out looking.`
+      : `${batter} struck out swinging.`
+  }
+
+  if (result.type === "lineout") {
+    return `${batter} lined out to ${result.location}.`
+  }
+
+  if (result.type === "groundout") {
+    return `${batter} grounded out to ${result.location}.`
+  }
+
+  if (result.type === "flyout") {
+    return `${batter} flied out to ${result.location}.`
+  }
+
+  if (result.type === "popout") {
+    return `${batter} popped out to ${result.location}.`
+  }
+
+  return ""
+}
 
 export function applyPlay(
   state: GameState,
@@ -28,19 +66,22 @@ export function applyPlay(
 
   const currentBatter = lineup[battingIndex]
 
-  const playDescription = `${currentBatter} - ${result}`
+  const playDescription = buildPlayDescription(
+    currentBatter,
+    result
+  )
 
   const pitcher = isTop
     ? newState.pitcherHome
     : newState.pitcherAway
 
   // Handle outs
-  if (result === "strikeout" || result === "flyout") {
+  if (result.type === "strikeout" || result.type === "flyout") {
     newState.outs += 1
 
     newState.playerStats[currentBatter].atBats += 1
     newState.playerStats[pitcher].strikeoutsPitched +=
-      result === "strikeout" ? 1 : 0
+      result.type === "strikeout" ? 1 : 0
     newState.playerStats[pitcher].inningsPitched += 1
 
     advanceBatterIndex(newState)
@@ -51,7 +92,7 @@ export function applyPlay(
   }
 
   // Walk (no AB)
-  if (result === "walk") {
+  if (result.type === "walk") {
     advanceRunners(newState, 1)
     newState.bases.first = currentBatter
     checkPostPlayEndConditions(newState)
@@ -62,11 +103,11 @@ export function applyPlay(
 
   // Hits
   const basesToAdvance =
-    result === "single"
+    result.type === "single"
       ? 1
-      : result === "double"
+      : result.type === "double"
       ? 2
-      : result === "triple"
+      : result.type === "triple"
       ? 3
       : 4
 

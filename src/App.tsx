@@ -76,10 +76,65 @@ export default function App() {
       </div>
 
       {/* Current Batter */}
-      <div className="bg-white rounded-xl shadow p-4">
-        <p className="font-semibold">
+      <div className="bg-white rounded-xl shadow p-4 space-y-2">
+        <p className="font-semibold text-lg">
           Current Batter: {currentBatter}
         </p>
+
+        <div className="text-sm">
+          <p>
+            H/AB: {gameState.playerStats[currentBatter].hits}/{gameState.playerStats[currentBatter].atBats}
+          </p>
+          <p>
+            {gameState.playerStats[currentBatter].rbis} RBI
+          </p>
+        </div>
+      </div>
+
+      {/* On Deck / In The Hole */}
+      <div className="bg-white rounded-xl shadow p-4">
+        <p className="font-medium">
+          On Deck: {
+            lineup[(battingIndex + 1) % lineup.length]
+          }
+        </p>
+        <p className="font-medium">
+          In The Hole: {
+            lineup[(battingIndex + 2) % lineup.length]
+          }
+        </p>
+      </div>
+
+      {/* Current Pitcher */}
+      <div className="bg-white rounded-xl shadow p-4 space-y-2">
+        <p className="font-semibold text-lg">
+          Pitcher: {
+            isTop
+              ? gameState.pitcherHome
+              : gameState.pitcherAway
+          }
+        </p>
+
+        <div className="text-sm">
+          <p>
+            Strikeouts: {
+              gameState.playerStats[
+                isTop
+                  ? gameState.pitcherHome
+                  : gameState.pitcherAway
+              ].strikeoutsPitched
+            }
+          </p>
+          <p>
+            Innings Pitched: {
+              gameState.playerStats[
+                isTop
+                  ? gameState.pitcherHome
+                  : gameState.pitcherAway
+              ].inningsPitched
+            }
+          </p>
+        </div>
       </div>
 
       {/* Controls */}

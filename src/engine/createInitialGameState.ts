@@ -71,6 +71,5 @@ export function createInitialGameState(): GameState {
 
     playerStats,
 
-    history: [],
   }
 }

@@ -38,4 +38,7 @@ export interface GameState {
   playerStats: Record<string, PlayerStats>
 
   playLog: string[]
+
+  maxInnings: number
+  isGameOver: boolean
 }

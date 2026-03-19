@@ -7,6 +7,19 @@ export default function App() {
     createInitialGameState()
   )
 
+  const getInningDisplay = () => {
+    if (gameState.isGameOver) {
+      // Extra innings case
+      if (gameState.inning - 1 > gameState.maxInnings) {
+        return `Final / ${gameState.inning - 1}`
+      }
+
+      return "Final"
+    }
+
+    return `${gameState.inning} ${gameState.inningSide}`
+  }
+
   const [history, setHistory] = useState<
     typeof gameState[]
   >([])
@@ -49,7 +62,7 @@ export default function App() {
 
         <div className="flex justify-between">
           <span>
-            {gameState.inning} {gameState.inningSide}
+            {getInningDisplay()}
           </span>
           <span>Outs: {gameState.outs}</span>
         </div>

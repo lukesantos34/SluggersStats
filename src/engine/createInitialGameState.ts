@@ -72,5 +72,8 @@ export function createInitialGameState(): GameState {
     playerStats,
 
     playLog: [],
+
+    maxInnings: 3,
+    isGameOver: false,
   }
 }

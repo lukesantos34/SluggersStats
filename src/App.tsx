@@ -1,388 +1,332 @@
-import { useState } from "react"
-import { createInitialGameState } from "./engine/createInitialGameState"
-import { applyPlay, type PlayResult } from "./engine/applyPlay"
+import { useMemo, useState } from "react";
+import type { GameState } from "./engine/types";
+import { buildGameStateFromSetup } from "./lib/buildGameStateFromSetup";
+import { SeasonDashboardScreen } from "./screens/SeasonDashboardScreen";
+import { PregameSetupScreen } from "./screens/PregameSetupScreen";
+import { LiveGameScreen } from "./screens/LiveGameScreen";
 
-export default function App() {
-  const [gameState, setGameState] = useState(
-    createInitialGameState()
-  )
+type Screen = "season" | "pregame" | "live";
 
-  type Tab = "game" | "log" | "team1" | "team2"
+interface SeasonGame {
+  id: string;
+  homeManager: string;
+  awayManager: string;
+  isComplete: boolean;
+  homeScore?: number;
+  awayScore?: number;
+}
 
-  const [activeTab, setActiveTab] = useState<Tab>("game")
+interface SeasonState {
+  id: string;
+  name: string;
+  games: SeasonGame[];
+}
 
-  const getInningDisplay = () => {
-    if (gameState.isGameOver) {
-      // Extra innings case
-      if (gameState.inning - 1 > gameState.maxInnings) {
-        return `Final / ${gameState.inning - 1}`
-      }
+interface StandingRow {
+  manager: string;
+  wins: number;
+  losses: number;
+  played: number;
+}
 
-      return "Final"
+interface PregameConfig {
+  managerA: string;
+  managerB: string;
+  homeManager: string;
+  awayManager: string;
+  maxInnings: number;
+  lineupHome: string[];
+  lineupAway: string[];
+  pitcherHome: string;
+  pitcherAway: string;
+}
+
+interface PendingPregameContext {
+  gameId: string;
+  managerA: string;
+  managerB: string;
+}
+
+interface LiveGameSession {
+  gameId: string;
+  initialState: GameState;
+}
+
+interface StartPregameInput {
+  gameId?: string;
+  managerA: string;
+  managerB: string;
+}
+
+function createId(prefix: string): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return prefix + "_" + crypto.randomUUID();
+  }
+
+  return prefix + "_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2);
+}
+
+function normalizeName(name: string, fallback: string): string {
+  const trimmed = name.trim();
+  return trimmed.length > 0 ? trimmed : fallback;
+}
+
+function upsertSeasonGame(
+  season: SeasonState,
+  input: StartPregameInput
+): { nextSeason: SeasonState; gameId: string } {
+  if (input.gameId) {
+    const existing = season.games.find((game) => game.id === input.gameId);
+    if (existing) {
+      return { nextSeason: season, gameId: existing.id };
+    }
+  }
+
+  const newGame: SeasonGame = {
+    id: createId("game"),
+    homeManager: normalizeName(input.managerA, "Manager A"),
+    awayManager: normalizeName(input.managerB, "Manager B"),
+    isComplete: false,
+  };
+
+  return {
+    nextSeason: {
+      ...season,
+      games: [...season.games, newGame],
+    },
+    gameId: newGame.id,
+  };
+}
+
+function computeStandings(season: SeasonState | null): StandingRow[] {
+  if (!season) {
+    return [];
+  }
+
+  const table = new Map<string, StandingRow>();
+
+  const ensureManager = (manager: string): StandingRow => {
+    const key = normalizeName(manager, "Unknown");
+    const existing = table.get(key);
+    if (existing) {
+      return existing;
     }
 
-    return `${gameState.inning} ${gameState.inningSide}`
+    const row: StandingRow = {
+      manager: key,
+      wins: 0,
+      losses: 0,
+      played: 0,
+    };
+
+    table.set(key, row);
+    return row;
+  };
+
+  season.games.forEach((game) => {
+    const home = ensureManager(game.homeManager);
+    const away = ensureManager(game.awayManager);
+
+    if (!game.isComplete || game.homeScore === undefined || game.awayScore === undefined) {
+      return;
+    }
+
+    home.played += 1;
+    away.played += 1;
+
+    if (game.homeScore > game.awayScore) {
+      home.wins += 1;
+      away.losses += 1;
+      return;
+    }
+
+    if (game.awayScore > game.homeScore) {
+      away.wins += 1;
+      home.losses += 1;
+    }
+  });
+
+  return Array.from(table.values()).sort((a, b) => {
+    if (b.wins !== a.wins) {
+      return b.wins - a.wins;
+    }
+
+    if (a.losses !== b.losses) {
+      return a.losses - b.losses;
+    }
+
+    return a.manager.localeCompare(b.manager);
+  });
+}
+
+export default function App() {
+  const [screen, setScreen] = useState<Screen>("season");
+  const [season, setSeason] = useState<SeasonState | null>(null);
+  const [pendingPregame, setPendingPregame] = useState<PendingPregameContext | null>(null);
+  const [liveSession, setLiveSession] = useState<LiveGameSession | null>(null);
+
+  const standings = useMemo(() => computeStandings(season), [season]);
+
+  function handleCreateSeason(name: string): void {
+    const seasonName = normalizeName(name, "New Season");
+    setSeason({
+      id: createId("season"),
+      name: seasonName,
+      games: [],
+    });
+    setPendingPregame(null);
+    setLiveSession(null);
+    setScreen("season");
   }
 
-  const [history, setHistory] = useState<
-    typeof gameState[]
-  >([])
+  function handleAddGame(managerA: string, managerB: string): void {
+    setSeason((current) => {
+      if (!current) {
+        return {
+          id: createId("season"),
+          name: "New Season",
+          games: [
+            {
+              id: createId("game"),
+              homeManager: normalizeName(managerA, "Manager A"),
+              awayManager: normalizeName(managerB, "Manager B"),
+              isComplete: false,
+            },
+          ],
+        };
+      }
 
-  type PlayBuilder =
-    | { step: "root" }
-    | { step: "outType" }
-    | { step: "strikeoutType" }
-    | { step: "outLocation"; outKind: "groundout" | "lineout" | "flyout" | "popout" }
+      const nextGame: SeasonGame = {
+        id: createId("game"),
+        homeManager: normalizeName(managerA, "Manager A"),
+        awayManager: normalizeName(managerB, "Manager B"),
+        isComplete: false,
+      };
 
-
-  const [playBuilder, setPlayBuilder] = useState<PlayBuilder>({
-    step: "root",
-  })
-
-  function handlePlay(result: PlayResult) {
-    setHistory((prev) => [...prev, gameState])
-    const newState = applyPlay(gameState, result)
-    setGameState(newState)
+      return {
+        ...current,
+        games: [...current.games, nextGame],
+      };
+    });
   }
 
-  function applyAndReset(result: PlayResult) {
-    handlePlay(result)
-    setPlayBuilder({ step: "root" })
+  function handleStartPregame(input: StartPregameInput): void {
+    if (!season) {
+      const seededSeason: SeasonState = {
+        id: createId("season"),
+        name: "New Season",
+        games: [],
+      };
+
+      const { nextSeason, gameId } = upsertSeasonGame(seededSeason, input);
+      setSeason(nextSeason);
+      setPendingPregame({
+        gameId,
+        managerA: normalizeName(input.managerA, "Manager A"),
+        managerB: normalizeName(input.managerB, "Manager B"),
+      });
+      setScreen("pregame");
+      return;
+    }
+
+    const { nextSeason, gameId } = upsertSeasonGame(season, input);
+    setSeason(nextSeason);
+    setPendingPregame({
+      gameId,
+      managerA: normalizeName(input.managerA, "Manager A"),
+      managerB: normalizeName(input.managerB, "Manager B"),
+    });
+    setScreen("pregame");
   }
 
-  function handleUndo() {
-    if (history.length === 0) return
-
-    const previous = history[history.length - 1]
-    setHistory((prev) => prev.slice(0, -1))
-    setGameState(previous)
+  function handleCancelPregame(): void {
+    setPendingPregame(null);
+    setScreen("season");
   }
 
-  function finalizeStrikeout(kind: "looking" | "swinging") {
-    applyAndReset({ type: "strikeout", kind })
+  function handleConfirmPregame(config: PregameConfig): void {
+    if (!pendingPregame) {
+      return;
+    }
+
+    const initialState = buildGameStateFromSetup(config);
+
+    setLiveSession({
+      gameId: pendingPregame.gameId,
+      initialState,
+    });
+
+    setScreen("live");
   }
 
-  function finalizeFieldOut(
-    type: "groundout" | "lineout" | "flyout" | "popout",
-    location: string
-  ) {
-    applyAndReset({ type, location })
+  function handleBackToSeasonFromLive(): void {
+    setLiveSession(null);
+    setPendingPregame(null);
+    setScreen("season");
   }
 
-  const isTop = gameState.inningSide === "top"
-  const lineup = isTop
-    ? gameState.lineupAway
-    : gameState.lineupHome
-  const battingIndex = isTop
-    ? gameState.battingIndexAway
-    : gameState.battingIndexHome
-  const currentBatter = lineup[battingIndex]
+  function handleGameComplete(finalState: GameState): void {
+    if (!liveSession) {
+      setScreen("season");
+      return;
+    }
+
+    setSeason((current) => {
+      if (!current) {
+        return current;
+      }
+
+      return {
+        ...current,
+        games: current.games.map((game) => {
+          if (game.id !== liveSession.gameId) {
+            return game;
+          }
+
+          return {
+            ...game,
+            isComplete: true,
+            homeScore: finalState.score.home,
+            awayScore: finalState.score.away,
+          };
+        }),
+      };
+    });
+
+    setLiveSession(null);
+    setPendingPregame(null);
+    setScreen("season");
+  }
+
+  if (screen === "pregame" && pendingPregame) {
+    return (
+      <PregameSetupScreen
+        managerA={pendingPregame.managerA}
+        managerB={pendingPregame.managerB}
+        defaultMaxInnings={3}
+        onBack={handleCancelPregame}
+        onConfirm={handleConfirmPregame}
+      />
+    );
+  }
+
+  if (screen === "live" && liveSession) {
+    return (
+      <LiveGameScreen
+        initialGameState={liveSession.initialState}
+        onBackToSeason={handleBackToSeasonFromLive}
+        onGameComplete={handleGameComplete}
+      />
+    );
+  }
 
   return (
-    <div className="h-screen bg-gray-100 p-3 flex flex-col gap-3">
-      <h1 className="text-xl font-bold text-center">
-        SluggerStats
-      </h1>
-
-      {/* Tabs */}
-      <div className="grid grid-cols-4 text-xs mb-3">
-        <button
-          onClick={() => setActiveTab("game")}
-          className={`p-2 ${activeTab === "game" ? "bg-gray-800 text-white" : "bg-gray-200"}`}
-        >
-          Game
-        </button>
-
-        <button
-          onClick={() => setActiveTab("log")}
-          className={`p-2 ${activeTab === "log" ? "bg-gray-800 text-white" : "bg-gray-200"}`}
-        >
-          Play by Play
-        </button>
-
-        <button
-          onClick={() => setActiveTab("team1")}
-          className={`p-2 ${activeTab === "team1" ? "bg-gray-800 text-white" : "bg-gray-200"}`}
-        >
-          Team 1 Stats
-        </button>
-
-        <button
-          onClick={() => setActiveTab("team2")}
-          className={`p-2 ${activeTab === "team2" ? "bg-gray-800 text-white" : "bg-gray-200"}`}
-        >
-          Team 2 Stats
-        </button>
-      </div>
-
-      {/* Top Section */}
-      <div className="bg-white rounded-xl shadow p-3 text-sm">
-        <div className="flex justify-between font-semibold">
-          <span>Away: {gameState.score.away}</span>
-          <span>Home: {gameState.score.home}</span>
-        </div>
-
-        <div className="flex justify-between">
-          <span>
-            {getInningDisplay()}
-          </span>
-          <span>Outs: {gameState.outs}</span>
-        </div>
-      </div>
-
-      {activeTab === "game" && (
-        <>
-          {/* Middle Section */}
-          <div className="flex flex-1 gap-3 overflow-hidden">
-            {/* Left: Bases + Stats */}
-            <div className="flex-1 bg-white rounded-xl shadow p-3 text-xs space-y-2">
-              <div>
-                2B: {gameState.bases.second ?? "-"}
-              </div>
-              <div className="flex justify-between">
-                <span>
-                  3B: {gameState.bases.third ?? "-"}
-                </span>
-                <span>
-                  1B: {gameState.bases.first ?? "-"}
-                </span>
-              </div>
-
-              <div className="pt-2 border-t">
-                <p className="font-semibold">
-                  {currentBatter}
-                </p>
-                <p>
-                  AB: {gameState.playerStats[currentBatter].atBats}
-                </p>
-                <p>
-                  H: {gameState.playerStats[currentBatter].hits}
-                </p>
-                <p>
-                  RBI: {gameState.playerStats[currentBatter].rbis}
-                </p>
-              </div>
-            </div>
-
-            {/* Right: Play Log */}
-            <div className="flex-1 bg-white rounded-xl shadow p-3 text-xs overflow-y-auto">
-              <p className="font-semibold mb-2">
-                Play Log
-              </p>
-              {gameState.playLog
-                .slice()
-                .reverse()
-                .map((play, index) => (
-                  <p key={index}>{play}</p>
-                ))}
-            </div>
-          </div>
-
-        {/* Bottom Controls */}
-
-        {playBuilder.step === "root" && (
-          <div className="grid grid-cols-3 gap-2 text-xs">
-            <button
-              onClick={() => setPlayBuilder({ step: "outType" })}
-              className="bg-red-500 text-white rounded p-2 col-span-3"
-            >
-              OUT
-            </button>
-
-            <button
-              onClick={() => applyAndReset({ type: "single" })}
-              className="bg-green-500 text-white rounded p-2"
-            >
-              1B
-            </button>
-
-            <button
-              onClick={() => applyAndReset({ type: "double" })}
-              className="bg-green-600 text-white rounded p-2"
-            >
-              2B
-            </button>
-
-            <button
-              onClick={() => applyAndReset({ type: "homerun" })}
-              className="bg-green-800 text-white rounded p-2"
-            >
-              HR
-            </button>
-
-            <button
-              onClick={() => applyAndReset({ type: "triple" })}
-              className="bg-green-700 text-white rounded p-2"
-            >
-              3B
-            </button>
-
-            <button
-              onClick={() => applyAndReset({ type: "walk" })}
-              className="bg-blue-500 text-white rounded p-2"
-            >
-              BB
-            </button>
-
-            <button
-              onClick={handleUndo}
-              className="bg-gray-700 text-white rounded p-2 col-span-3"
-            >
-              Undo
-            </button>
-          </div>
-        )}
-
-        {playBuilder.step === "outType" && (
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <button
-              onClick={() => setPlayBuilder({ step: "strikeoutType" })}
-              className="bg-red-600 text-white rounded p-2 col-span-2"
-            >
-              Strikeout
-            </button>
-
-            <button
-              onClick={() =>
-                setPlayBuilder({ step: "outLocation", outKind: "groundout" })
-              }
-              className="bg-red-500 text-white rounded p-2"
-            >
-              Groundout
-            </button>
-
-            <button
-              onClick={() =>
-                setPlayBuilder({ step: "outLocation", outKind: "lineout" })
-              }
-              className="bg-red-500 text-white rounded p-2"
-            >
-              Lineout
-            </button>
-
-            <button
-              onClick={() =>
-                setPlayBuilder({ step: "outLocation", outKind: "flyout" })
-              }
-              className="bg-red-500 text-white rounded p-2"
-            >
-              Flyout
-            </button>
-
-            <button
-              onClick={() =>
-                setPlayBuilder({ step: "outLocation", outKind: "popout" })
-              }
-              className="bg-red-500 text-white rounded p-2"
-            >
-              Popout
-            </button>
-
-            <button
-              onClick={() => setPlayBuilder({ step: "root" })}
-              className="bg-gray-700 text-white rounded p-2 col-span-2"
-            >
-              Back
-            </button>
-          </div>
-        )}    
-
-        {playBuilder.step === "strikeoutType" && (
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <button
-              onClick={() => finalizeStrikeout("looking")}
-              className="bg-red-600 text-white rounded p-2"
-            >
-              Looking
-            </button>
-
-            <button
-              onClick={() => finalizeStrikeout("swinging")}
-              className="bg-red-600 text-white rounded p-2"
-            >
-              Swinging
-            </button>
-
-            <button
-              onClick={() => setPlayBuilder({ step: "outType" })}
-              className="bg-gray-700 text-white rounded p-2 col-span-2"
-            >
-              Back
-            </button>
-          </div>
-        )}
-
-        {playBuilder.step === "outLocation" && (
-          <div className="grid grid-cols-5 gap-2 text-xs">
-            {["pitcher", "first", "second", "shortstop", "third", "left", "center", "right", "catcher"].map((pos) => (
-              <button
-                key={pos}
-                onClick={() =>
-                  finalizeFieldOut(playBuilder.outKind, pos)
-                }
-                className="bg-red-500 text-white rounded p-2"
-              >
-                {pos}
-              </button>
-            ))}
-
-            <button
-              onClick={() => setPlayBuilder({ step: "outType" })}
-              className="bg-gray-700 text-white rounded p-2 col-span-4"
-            >
-              Back
-            </button>
-          </div>
-        )}
-        </>
-      )}
-
-      {activeTab === "log" && (
-        <div className="text-xs space-y-1 max-h-96 overflow-y-auto">
-          {gameState.playLog.length === 0 && (
-            <div className="text-gray-500">No plays yet.</div>
-          )}
-
-          {gameState.playLog.map((play, index) => (
-            <div key={index}>
-              {play}
-            </div>
-          ))}
-        </div>
-      )}
-    
-      {activeTab === "team1" && (
-        <div className="text-xs">
-          <div className="font-bold mb-2">Home</div>
-
-          {gameState.lineupHome.map((name) => {
-            const stats = gameState.playerStats[name]
-
-            return (
-              <div key={name}>
-                {name} — AB: {stats.atBats} H: {stats.hits} RBI: {stats.rbis}
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {activeTab === "team2" && (
-        <div className="text-xs">
-          <div className="font-bold mb-2">Away</div>
-
-          {gameState.lineupAway.map((name) => {
-            const stats = gameState.playerStats[name]
-
-            return (
-              <div key={name}>
-                {name} — AB: {stats.atBats} H: {stats.hits} RBI: {stats.rbis}
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-    </div>
-  )
+    <SeasonDashboardScreen
+      season={season}
+      standings={standings}
+      onCreateSeason={handleCreateSeason}
+      onAddGame={handleAddGame}
+      onStartPregame={handleStartPregame}
+    />
+  );
 }

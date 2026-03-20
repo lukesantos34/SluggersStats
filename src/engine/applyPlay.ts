@@ -76,7 +76,7 @@ export function applyPlay(
     : newState.pitcherAway
 
   // Handle outs
-  if (result.type === "strikeout" || result.type === "flyout") {
+  if (result.type === "strikeout" || result.type === "flyout" || result.type === "lineout" || result.type === "groundout" || result.type === "popout") {
     newState.outs += 1
 
     newState.playerStats[currentBatter].atBats += 1

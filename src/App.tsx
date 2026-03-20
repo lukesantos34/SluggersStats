@@ -7,6 +7,10 @@ export default function App() {
     createInitialGameState()
   )
 
+  type Tab = "game" | "log" | "team1" | "team2"
+
+  const [activeTab, setActiveTab] = useState<Tab>("game")
+
   const getInningDisplay = () => {
     if (gameState.isGameOver) {
       // Extra innings case
@@ -58,6 +62,13 @@ export default function App() {
     applyAndReset({ type: "strikeout", kind })
   }
 
+  function finalizeFieldOut(
+    type: "groundout" | "lineout" | "flyout" | "popout",
+    location: string
+  ) {
+    applyAndReset({ type, location })
+  }
+
   const isTop = gameState.inningSide === "top"
   const lineup = isTop
     ? gameState.lineupAway
@@ -72,6 +83,37 @@ export default function App() {
       <h1 className="text-xl font-bold text-center">
         SluggerStats
       </h1>
+
+      {/* Tabs */}
+      <div className="grid grid-cols-4 text-xs mb-3">
+        <button
+          onClick={() => setActiveTab("game")}
+          className={`p-2 ${activeTab === "game" ? "bg-gray-800 text-white" : "bg-gray-200"}`}
+        >
+          Game
+        </button>
+
+        <button
+          onClick={() => setActiveTab("log")}
+          className={`p-2 ${activeTab === "log" ? "bg-gray-800 text-white" : "bg-gray-200"}`}
+        >
+          Play by Play
+        </button>
+
+        <button
+          onClick={() => setActiveTab("team1")}
+          className={`p-2 ${activeTab === "team1" ? "bg-gray-800 text-white" : "bg-gray-200"}`}
+        >
+          Team 1 Stats
+        </button>
+
+        <button
+          onClick={() => setActiveTab("team2")}
+          className={`p-2 ${activeTab === "team2" ? "bg-gray-800 text-white" : "bg-gray-200"}`}
+        >
+          Team 2 Stats
+        </button>
+      </div>
 
       {/* Top Section */}
       <div className="bg-white rounded-xl shadow p-3 text-sm">
@@ -88,186 +130,259 @@ export default function App() {
         </div>
       </div>
 
-      {/* Middle Section */}
-      <div className="flex flex-1 gap-3 overflow-hidden">
-        {/* Left: Bases + Stats */}
-        <div className="flex-1 bg-white rounded-xl shadow p-3 text-xs space-y-2">
-          <div>
-            2B: {gameState.bases.second ?? "-"}
-          </div>
-          <div className="flex justify-between">
-            <span>
-              3B: {gameState.bases.third ?? "-"}
-            </span>
-            <span>
-              1B: {gameState.bases.first ?? "-"}
-            </span>
+      {activeTab === "game" && (
+        <>
+          {/* Middle Section */}
+          <div className="flex flex-1 gap-3 overflow-hidden">
+            {/* Left: Bases + Stats */}
+            <div className="flex-1 bg-white rounded-xl shadow p-3 text-xs space-y-2">
+              <div>
+                2B: {gameState.bases.second ?? "-"}
+              </div>
+              <div className="flex justify-between">
+                <span>
+                  3B: {gameState.bases.third ?? "-"}
+                </span>
+                <span>
+                  1B: {gameState.bases.first ?? "-"}
+                </span>
+              </div>
+
+              <div className="pt-2 border-t">
+                <p className="font-semibold">
+                  {currentBatter}
+                </p>
+                <p>
+                  AB: {gameState.playerStats[currentBatter].atBats}
+                </p>
+                <p>
+                  H: {gameState.playerStats[currentBatter].hits}
+                </p>
+                <p>
+                  RBI: {gameState.playerStats[currentBatter].rbis}
+                </p>
+              </div>
+            </div>
+
+            {/* Right: Play Log */}
+            <div className="flex-1 bg-white rounded-xl shadow p-3 text-xs overflow-y-auto">
+              <p className="font-semibold mb-2">
+                Play Log
+              </p>
+              {gameState.playLog
+                .slice()
+                .reverse()
+                .map((play, index) => (
+                  <p key={index}>{play}</p>
+                ))}
+            </div>
           </div>
 
-          <div className="pt-2 border-t">
-            <p className="font-semibold">
-              {currentBatter}
-            </p>
-            <p>
-              AB: {gameState.playerStats[currentBatter].atBats}
-            </p>
-            <p>
-              H: {gameState.playerStats[currentBatter].hits}
-            </p>
-            <p>
-              RBI: {gameState.playerStats[currentBatter].rbis}
-            </p>
-          </div>
-        </div>
+        {/* Bottom Controls */}
 
-        {/* Right: Play Log */}
-        <div className="flex-1 bg-white rounded-xl shadow p-3 text-xs overflow-y-auto">
-          <p className="font-semibold mb-2">
-            Play Log
-          </p>
-          {gameState.playLog
-            .slice()
-            .reverse()
-            .map((play, index) => (
-              <p key={index}>{play}</p>
+        {playBuilder.step === "root" && (
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            <button
+              onClick={() => setPlayBuilder({ step: "outType" })}
+              className="bg-red-500 text-white rounded p-2 col-span-3"
+            >
+              OUT
+            </button>
+
+            <button
+              onClick={() => applyAndReset({ type: "single" })}
+              className="bg-green-500 text-white rounded p-2"
+            >
+              1B
+            </button>
+
+            <button
+              onClick={() => applyAndReset({ type: "double" })}
+              className="bg-green-600 text-white rounded p-2"
+            >
+              2B
+            </button>
+
+            <button
+              onClick={() => applyAndReset({ type: "homerun" })}
+              className="bg-green-800 text-white rounded p-2"
+            >
+              HR
+            </button>
+
+            <button
+              onClick={() => applyAndReset({ type: "triple" })}
+              className="bg-green-700 text-white rounded p-2"
+            >
+              3B
+            </button>
+
+            <button
+              onClick={() => applyAndReset({ type: "walk" })}
+              className="bg-blue-500 text-white rounded p-2"
+            >
+              BB
+            </button>
+
+            <button
+              onClick={handleUndo}
+              className="bg-gray-700 text-white rounded p-2 col-span-3"
+            >
+              Undo
+            </button>
+          </div>
+        )}
+
+        {playBuilder.step === "outType" && (
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <button
+              onClick={() => setPlayBuilder({ step: "strikeoutType" })}
+              className="bg-red-600 text-white rounded p-2 col-span-2"
+            >
+              Strikeout
+            </button>
+
+            <button
+              onClick={() =>
+                setPlayBuilder({ step: "outLocation", outKind: "groundout" })
+              }
+              className="bg-red-500 text-white rounded p-2"
+            >
+              Groundout
+            </button>
+
+            <button
+              onClick={() =>
+                setPlayBuilder({ step: "outLocation", outKind: "lineout" })
+              }
+              className="bg-red-500 text-white rounded p-2"
+            >
+              Lineout
+            </button>
+
+            <button
+              onClick={() =>
+                setPlayBuilder({ step: "outLocation", outKind: "flyout" })
+              }
+              className="bg-red-500 text-white rounded p-2"
+            >
+              Flyout
+            </button>
+
+            <button
+              onClick={() =>
+                setPlayBuilder({ step: "outLocation", outKind: "popout" })
+              }
+              className="bg-red-500 text-white rounded p-2"
+            >
+              Popout
+            </button>
+
+            <button
+              onClick={() => setPlayBuilder({ step: "root" })}
+              className="bg-gray-700 text-white rounded p-2 col-span-2"
+            >
+              Back
+            </button>
+          </div>
+        )}    
+
+        {playBuilder.step === "strikeoutType" && (
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <button
+              onClick={() => finalizeStrikeout("looking")}
+              className="bg-red-600 text-white rounded p-2"
+            >
+              Looking
+            </button>
+
+            <button
+              onClick={() => finalizeStrikeout("swinging")}
+              className="bg-red-600 text-white rounded p-2"
+            >
+              Swinging
+            </button>
+
+            <button
+              onClick={() => setPlayBuilder({ step: "outType" })}
+              className="bg-gray-700 text-white rounded p-2 col-span-2"
+            >
+              Back
+            </button>
+          </div>
+        )}
+
+        {playBuilder.step === "outLocation" && (
+          <div className="grid grid-cols-5 gap-2 text-xs">
+            {["pitcher", "first", "second", "shortstop", "third", "left", "center", "right", "catcher"].map((pos) => (
+              <button
+                key={pos}
+                onClick={() =>
+                  finalizeFieldOut(playBuilder.outKind, pos)
+                }
+                className="bg-red-500 text-white rounded p-2"
+              >
+                {pos}
+              </button>
             ))}
+
+            <button
+              onClick={() => setPlayBuilder({ step: "outType" })}
+              className="bg-gray-700 text-white rounded p-2 col-span-4"
+            >
+              Back
+            </button>
+          </div>
+        )}
+        </>
+      )}
+
+      {activeTab === "log" && (
+        <div className="text-xs space-y-1 max-h-96 overflow-y-auto">
+          {gameState.playLog.length === 0 && (
+            <div className="text-gray-500">No plays yet.</div>
+          )}
+
+          {gameState.playLog.map((play, index) => (
+            <div key={index}>
+              {play}
+            </div>
+          ))}
         </div>
-      </div>
-
-    {/* Bottom Controls */}
-
-    {playBuilder.step === "root" && (
-      <div className="grid grid-cols-3 gap-2 text-xs">
-        <button
-          onClick={() => setPlayBuilder({ step: "outType" })}
-          className="bg-red-500 text-white rounded p-2 col-span-3"
-        >
-          OUT
-        </button>
-
-        <button
-          onClick={() => applyAndReset({ type: "single" })}
-          className="bg-green-500 text-white rounded p-2"
-        >
-          1B
-        </button>
-
-        <button
-          onClick={() => applyAndReset({ type: "double" })}
-          className="bg-green-600 text-white rounded p-2"
-        >
-          2B
-        </button>
-
-        <button
-          onClick={() => applyAndReset({ type: "homerun" })}
-          className="bg-green-800 text-white rounded p-2"
-        >
-          HR
-        </button>
-
-        <button
-          onClick={() => applyAndReset({ type: "triple" })}
-          className="bg-green-700 text-white rounded p-2"
-        >
-          3B
-        </button>
-
-        <button
-          onClick={() => applyAndReset({ type: "walk" })}
-          className="bg-blue-500 text-white rounded p-2"
-        >
-          BB
-        </button>
-
-        <button
-          onClick={handleUndo}
-          className="bg-gray-700 text-white rounded p-2 col-span-3"
-        >
-          Undo
-        </button>
-      </div>
-    )}
-
-    {playBuilder.step === "outType" && (
-      <div className="grid grid-cols-2 gap-2 text-xs">
-        <button
-          onClick={() => setPlayBuilder({ step: "strikeoutType" })}
-          className="bg-red-600 text-white rounded p-2 col-span-2"
-        >
-          Strikeout
-        </button>
-
-        <button
-          onClick={() =>
-            setPlayBuilder({ step: "outLocation", outKind: "groundout" })
-          }
-          className="bg-red-500 text-white rounded p-2"
-        >
-          Groundout
-        </button>
-
-        <button
-          onClick={() =>
-            setPlayBuilder({ step: "outLocation", outKind: "lineout" })
-          }
-          className="bg-red-500 text-white rounded p-2"
-        >
-          Lineout
-        </button>
-
-        <button
-          onClick={() =>
-            setPlayBuilder({ step: "outLocation", outKind: "flyout" })
-          }
-          className="bg-red-500 text-white rounded p-2"
-        >
-          Flyout
-        </button>
-
-        <button
-          onClick={() =>
-            setPlayBuilder({ step: "outLocation", outKind: "popout" })
-          }
-          className="bg-red-500 text-white rounded p-2"
-        >
-          Popout
-        </button>
-
-        <button
-          onClick={() => setPlayBuilder({ step: "root" })}
-          className="bg-gray-700 text-white rounded p-2 col-span-2"
-        >
-          Back
-        </button>
-      </div>
-    )}    
-
-    {playBuilder.step === "strikeoutType" && (
-      <div className="grid grid-cols-2 gap-2 text-xs">
-        <button
-          onClick={() => finalizeStrikeout("looking")}
-          className="bg-red-600 text-white rounded p-2"
-        >
-          Looking
-        </button>
-
-        <button
-          onClick={() => finalizeStrikeout("swinging")}
-          className="bg-red-600 text-white rounded p-2"
-        >
-          Swinging
-        </button>
-
-        <button
-          onClick={() => setPlayBuilder({ step: "outType" })}
-          className="bg-gray-700 text-white rounded p-2 col-span-2"
-        >
-          Back
-        </button>
-      </div>
-    )}
+      )}
     
+      {activeTab === "team1" && (
+        <div className="text-xs">
+          <div className="font-bold mb-2">Home</div>
+
+          {gameState.lineupHome.map((name) => {
+            const stats = gameState.playerStats[name]
+
+            return (
+              <div key={name}>
+                {name} — AB: {stats.atBats} H: {stats.hits} RBI: {stats.rbis}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {activeTab === "team2" && (
+        <div className="text-xs">
+          <div className="font-bold mb-2">Away</div>
+
+          {gameState.lineupAway.map((name) => {
+            const stats = gameState.playerStats[name]
+
+            return (
+              <div key={name}>
+                {name} — AB: {stats.atBats} H: {stats.hits} RBI: {stats.rbis}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
     </div>
   )
 }

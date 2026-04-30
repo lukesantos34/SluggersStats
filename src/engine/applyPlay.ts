@@ -1,3 +1,4 @@
+// applyPlay.ts - Core logic for applying a play result to the game state
 import type { GameState } from "./types"
 
 export type PlayResult =

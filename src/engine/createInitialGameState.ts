@@ -1,3 +1,4 @@
+// createInitialGameState.ts - Initializes the game state for a new game
 import type { GameState } from "./types"
 
 const homeLineup = [

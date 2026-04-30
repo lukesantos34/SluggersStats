@@ -1,3 +1,4 @@
+// App.tsx - Main React component for the SluggerStats application
 import { useState } from "react"
 import { createInitialGameState } from "./engine/createInitialGameState"
 import { applyPlay, type PlayResult } from "./engine/applyPlay"

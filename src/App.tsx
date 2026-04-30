@@ -2,7 +2,10 @@
 import { useState } from "react"
 import { createInitialGameState } from "./engine/createInitialGameState"
 import { applyPlay, applyResolvedPlay } from "./engine/applyPlay"
-import { buildBasicHitPlay } from "./engine/buildResolvedPlay"
+import {
+  buildBasicHitPlay,
+  buildBasicOutPlay,
+} from "./engine/buildResolvedPlay"
 import type {
   ContactType,
   FieldLocation,
@@ -34,6 +37,7 @@ export default function App() {
 
   type HitKind = "single" | "double" | "triple" | "inside_the_park_home_run"
   type ContactKind = ContactType
+  type OutKind = "groundout" | "lineout" | "flyout" | "popout" | "bunt_out"
 
   type PlayBuilder =
     | { step: "root" }
@@ -41,7 +45,7 @@ export default function App() {
     | { step: "strikeoutType" }
     | {
         step: "outLocation"
-        outKind: "groundout" | "lineout" | "flyout" | "popout"
+        outKind: OutKind
       }
     | { step: "hitType" }
     | {
@@ -105,18 +109,25 @@ export default function App() {
     setGameState(previous)
   }
 
-  function finalizeStrikeout(kind: "looking" | "swinging") {
-    applyAndReset({ type: "strikeout", kind })
+  function finalizeStrikeout(kind: "swinging" | "looking") {
+    const play = buildBasicOutPlay(gameState, {
+      result: "strikeout",
+      strikeoutType: kind,
+    })
+
+    applyResolvedAndReset(play)
   }
 
   function finalizeOutLocation(
-    outKind: "groundout" | "lineout" | "flyout" | "popout",
-    location: string
+    outKind: OutKind,
+    location: FieldLocation
   ) {
-    applyAndReset({
-      type: outKind,
+    const play = buildBasicOutPlay(gameState, {
+      result: outKind,
       location,
-    } as PlayResult)
+    })
+
+    applyResolvedAndReset(play)
   }
 
   function finalizeHitLocation(
@@ -308,6 +319,15 @@ export default function App() {
           className="bg-red-500 text-white rounded p-2"
         >
           Popout
+        </button>
+
+        <button
+          onClick={() =>
+            setPlayBuilder({ step: "outLocation", outKind: "bunt_out" })
+          }
+          className="bg-red-700 text-white rounded p-3 font-semibold"
+        >
+          Bunt Out
         </button>
 
         <button

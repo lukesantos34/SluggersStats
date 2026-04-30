@@ -29,8 +29,25 @@ export default function App() {
     | { step: "root" }
     | { step: "outType" }
     | { step: "strikeoutType" }
-    | { step: "outLocation"; outKind: "groundout" | "lineout" | "flyout" | "popout" }
+    | {
+        step: "outLocation"
+        outKind: "groundout" | "lineout" | "flyout" | "popout"
+      }
+    | { step: "hitType" }
+    | { step: "homeRunDirection" }
+    | { step: "walkType" }
 
+  const fieldLocations = [
+    { label: "P", value: "P" },
+    { label: "C", value: "C" },
+    { label: "1B", value: "1B" },
+    { label: "2B", value: "2B" },
+    { label: "SS", value: "SS" },
+    { label: "3B", value: "3B" },
+    { label: "LF", value: "LF" },
+    { label: "CF", value: "CF" },
+    { label: "RF", value: "RF" },
+  ]
 
   const [playBuilder, setPlayBuilder] = useState<PlayBuilder>({
     step: "root",
@@ -57,6 +74,28 @@ export default function App() {
 
   function finalizeStrikeout(kind: "looking" | "swinging") {
     applyAndReset({ type: "strikeout", kind })
+  }
+
+  function finalizeOutLocation(
+    outKind: "groundout" | "lineout" | "flyout" | "popout",
+    location: string
+  ) {
+    applyAndReset({
+      type: outKind,
+      location,
+    } as PlayResult)
+  }
+
+  function finalizeHit(type: "single" | "double" | "triple") {
+    applyAndReset({ type })
+  }
+
+  function finalizeHomeRun() {
+    applyAndReset({ type: "homerun" })
+  }
+
+  function handleComingSoon(feature: string) {
+    alert(`${feature} is coming soon.`)
   }
 
   const isTop = gameState.inningSide === "top"
@@ -138,54 +177,47 @@ export default function App() {
     {/* Bottom Controls */}
 
     {playBuilder.step === "root" && (
-      <div className="grid grid-cols-3 gap-2 text-xs">
+      <div className="grid grid-cols-2 gap-2 text-xs">
         <button
           onClick={() => setPlayBuilder({ step: "outType" })}
-          className="bg-red-500 text-white rounded p-2 col-span-3"
+          className="bg-red-500 text-white rounded p-3 font-semibold"
         >
           OUT
         </button>
 
         <button
-          onClick={() => applyAndReset({ type: "single" })}
-          className="bg-green-500 text-white rounded p-2"
+          onClick={() => setPlayBuilder({ step: "hitType" })}
+          className="bg-green-600 text-white rounded p-3 font-semibold"
         >
-          1B
+          HIT
         </button>
 
         <button
-          onClick={() => applyAndReset({ type: "double" })}
-          className="bg-green-600 text-white rounded p-2"
+          onClick={() => setPlayBuilder({ step: "homeRunDirection" })}
+          className="bg-green-800 text-white rounded p-3 font-semibold"
         >
-          2B
+          HOME RUN
         </button>
 
         <button
-          onClick={() => applyAndReset({ type: "homerun" })}
-          className="bg-green-800 text-white rounded p-2"
+          onClick={() => setPlayBuilder({ step: "walkType" })}
+          className="bg-blue-500 text-white rounded p-3 font-semibold"
         >
-          HR
+          WALK / HBP
         </button>
 
         <button
-          onClick={() => applyAndReset({ type: "triple" })}
-          className="bg-green-700 text-white rounded p-2"
+          onClick={() => handleComingSoon("Custom plays")}
+          className="bg-purple-600 text-white rounded p-3 font-semibold"
         >
-          3B
-        </button>
-
-        <button
-          onClick={() => applyAndReset({ type: "walk" })}
-          className="bg-blue-500 text-white rounded p-2"
-        >
-          BB
+          CUSTOM
         </button>
 
         <button
           onClick={handleUndo}
-          className="bg-gray-700 text-white rounded p-2 col-span-3"
+          className="bg-gray-700 text-white rounded p-3 font-semibold"
         >
-          Undo
+          UNDO
         </button>
       </div>
     )}
@@ -244,6 +276,33 @@ export default function App() {
       </div>
     )}    
 
+    {playBuilder.step === "outLocation" && (
+      <div className="grid grid-cols-3 gap-2 text-xs">
+        <p className="col-span-3 font-semibold text-center">
+          Select Location
+        </p>
+
+        {fieldLocations.map((location) => (
+          <button
+            key={location.value}
+            onClick={() =>
+              finalizeOutLocation(playBuilder.outKind, location.value)
+            }
+            className="bg-red-500 text-white rounded p-2"
+          >
+            {location.label}
+          </button>
+        ))}
+
+        <button
+          onClick={() => setPlayBuilder({ step: "outType" })}
+          className="bg-gray-700 text-white rounded p-2 col-span-3"
+        >
+          Back
+        </button>
+      </div>
+    )}
+
     {playBuilder.step === "strikeoutType" && (
       <div className="grid grid-cols-2 gap-2 text-xs">
         <button
@@ -269,6 +328,102 @@ export default function App() {
       </div>
     )}
     
+    {playBuilder.step === "hitType" && (
+      <div className="grid grid-cols-3 gap-2 text-xs">
+        <button
+          onClick={() => finalizeHit("single")}
+          className="bg-green-500 text-white rounded p-3 font-semibold"
+        >
+          Single
+        </button>
+
+        <button
+          onClick={() => finalizeHit("double")}
+          className="bg-green-600 text-white rounded p-3 font-semibold"
+        >
+          Double
+        </button>
+
+        <button
+          onClick={() => finalizeHit("triple")}
+          className="bg-green-700 text-white rounded p-3 font-semibold"
+        >
+          Triple
+        </button>
+
+        <button
+          onClick={() => handleComingSoon("Inside-the-park home runs")}
+          className="bg-green-800 text-white rounded p-3 col-span-3 font-semibold"
+        >
+          Inside-the-Park HR
+        </button>
+
+        <button
+          onClick={() => setPlayBuilder({ step: "root" })}
+          className="bg-gray-700 text-white rounded p-2 col-span-3"
+        >
+          Back
+        </button>
+      </div>
+    )}
+
+    {playBuilder.step === "homeRunDirection" && (
+      <div className="grid grid-cols-3 gap-2 text-xs">
+        <button
+          onClick={finalizeHomeRun}
+          className="bg-green-800 text-white rounded p-3 font-semibold"
+        >
+          Left
+        </button>
+
+        <button
+          onClick={finalizeHomeRun}
+          className="bg-green-800 text-white rounded p-3 font-semibold"
+        >
+          Center
+        </button>
+
+        <button
+          onClick={finalizeHomeRun}
+          className="bg-green-800 text-white rounded p-3 font-semibold"
+        >
+          Right
+        </button>
+
+        <button
+          onClick={() => setPlayBuilder({ step: "root" })}
+          className="bg-gray-700 text-white rounded p-2 col-span-3"
+        >
+          Back
+        </button>
+      </div>
+    )}
+
+    {playBuilder.step === "walkType" && (
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <button
+          onClick={() => applyAndReset({ type: "walk" })}
+          className="bg-blue-500 text-white rounded p-3 font-semibold"
+        >
+          4 Balls
+        </button>
+
+        <button
+          onClick={() => handleComingSoon("Hit by pitch")}
+          className="bg-blue-700 text-white rounded p-3 font-semibold"
+        >
+          Hit By Pitch
+        </button>
+
+        <button
+          onClick={() => setPlayBuilder({ step: "root" })}
+          className="bg-gray-700 text-white rounded p-2 col-span-2"
+        >
+          Back
+        </button>
+      </div>
+    )}
+
     </div>
   )
 }

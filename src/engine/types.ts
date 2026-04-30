@@ -243,3 +243,21 @@ export interface ResolvedPlay {
    */
   playByPlay: string
 }
+
+/**
+ * Temporary old play input type.
+ *
+ * The old applyPlay() function still uses this while we migrate the UI
+ * to ResolvedPlay.
+ */
+export type PlayResult =
+  | { type: "single" }
+  | { type: "double" }
+  | { type: "triple" }
+  | { type: "homerun" }
+  | { type: "walk" }
+  | { type: "strikeout"; kind: "looking" | "swinging" }
+  | { type: "groundout"; location: string }
+  | { type: "flyout"; location: string }
+  | { type: "lineout"; location: string }
+  | { type: "popout"; location: string }

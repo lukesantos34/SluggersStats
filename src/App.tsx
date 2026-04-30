@@ -1,7 +1,14 @@
 // App.tsx - Main React component for the SluggerStats application
 import { useState } from "react"
 import { createInitialGameState } from "./engine/createInitialGameState"
-import { applyPlay, type PlayResult } from "./engine/applyPlay"
+import { applyPlay, applyResolvedPlay } from "./engine/applyPlay"
+import { buildBasicHitPlay } from "./engine/buildResolvedPlay"
+import type {
+  ContactType,
+  FieldLocation,
+  ResolvedPlay,
+  PlayResult,
+} from "./engine/types"
 
 export default function App() {
   const [gameState, setGameState] = useState(
@@ -25,6 +32,9 @@ export default function App() {
     typeof gameState[]
   >([])
 
+  type HitKind = "single" | "double" | "triple" | "inside_the_park_home_run"
+  type ContactKind = ContactType
+
   type PlayBuilder =
     | { step: "root" }
     | { step: "outType" }
@@ -34,10 +44,19 @@ export default function App() {
         outKind: "groundout" | "lineout" | "flyout" | "popout"
       }
     | { step: "hitType" }
+    | {
+        step: "hitContact"
+        hitKind: HitKind
+      }
+    | {
+        step: "hitLocation"
+        hitKind: HitKind
+        contactType: ContactKind
+      }
     | { step: "homeRunDirection" }
     | { step: "walkType" }
 
-  const fieldLocations = [
+  const fieldLocations: { label: string; value: FieldLocation }[] = [
     { label: "P", value: "P" },
     { label: "C", value: "C" },
     { label: "1B", value: "1B" },
@@ -47,6 +66,14 @@ export default function App() {
     { label: "LF", value: "LF" },
     { label: "CF", value: "CF" },
     { label: "RF", value: "RF" },
+  ]
+
+  const contactTypes: { label: string; value: ContactType }[] = [
+    { label: "Ground", value: "ground" },
+    { label: "Line", value: "line" },
+    { label: "Fly", value: "fly" },
+    { label: "Pop", value: "pop" },
+    { label: "Bunt", value: "bunt" },
   ]
 
   const [playBuilder, setPlayBuilder] = useState<PlayBuilder>({
@@ -61,6 +88,12 @@ export default function App() {
 
   function applyAndReset(result: PlayResult) {
     handlePlay(result)
+    setPlayBuilder({ step: "root" })
+  }
+
+  function applyResolvedAndReset(play: ResolvedPlay) {
+    setHistory((prev) => [...prev, gameState])
+    setGameState((prev) => applyResolvedPlay(prev, play))
     setPlayBuilder({ step: "root" })
   }
 
@@ -86,8 +119,18 @@ export default function App() {
     } as PlayResult)
   }
 
-  function finalizeHit(type: "single" | "double" | "triple") {
-    applyAndReset({ type })
+  function finalizeHitLocation(
+    hitKind: HitKind,
+    contactType: ContactType,
+    location: FieldLocation
+  ) {
+    const play = buildBasicHitPlay(gameState, {
+      result: hitKind,
+      contactType,
+      location,
+    })
+
+    applyResolvedAndReset(play)
   }
 
   function finalizeHomeRun() {
@@ -329,37 +372,115 @@ export default function App() {
     )}
     
     {playBuilder.step === "hitType" && (
-      <div className="grid grid-cols-3 gap-2 text-xs">
+      <div className="grid grid-cols-2 gap-2 text-xs">
         <button
-          onClick={() => finalizeHit("single")}
+          onClick={() =>
+            setPlayBuilder({ step: "hitContact", hitKind: "single" })
+          }
           className="bg-green-500 text-white rounded p-3 font-semibold"
         >
           Single
         </button>
 
         <button
-          onClick={() => finalizeHit("double")}
+          onClick={() =>
+            setPlayBuilder({ step: "hitContact", hitKind: "double" })
+          }
           className="bg-green-600 text-white rounded p-3 font-semibold"
         >
           Double
         </button>
 
         <button
-          onClick={() => finalizeHit("triple")}
+          onClick={() =>
+            setPlayBuilder({ step: "hitContact", hitKind: "triple" })
+          }
           className="bg-green-700 text-white rounded p-3 font-semibold"
         >
           Triple
         </button>
 
         <button
-          onClick={() => handleComingSoon("Inside-the-park home runs")}
-          className="bg-green-800 text-white rounded p-3 col-span-3 font-semibold"
+          onClick={() =>
+            setPlayBuilder({
+              step: "hitContact",
+              hitKind: "inside_the_park_home_run",
+            })
+          }
+          className="bg-green-800 text-white rounded p-3 font-semibold"
         >
           Inside-the-Park HR
         </button>
 
         <button
           onClick={() => setPlayBuilder({ step: "root" })}
+          className="bg-gray-700 text-white rounded p-2 col-span-2"
+        >
+          Back
+        </button>
+      </div>
+    )}
+
+    {playBuilder.step === "hitContact" && (
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <p className="col-span-2 font-semibold text-center">
+          Select Contact Type
+        </p>
+
+        {contactTypes.map((contact) => (
+          <button
+            key={contact.value}
+            onClick={() =>
+              setPlayBuilder({
+                step: "hitLocation",
+                hitKind: playBuilder.hitKind,
+                contactType: contact.value,
+              })
+            }
+            className="bg-green-600 text-white rounded p-3 font-semibold"
+          >
+            {contact.label}
+          </button>
+        ))}
+
+        <button
+          onClick={() => setPlayBuilder({ step: "hitType" })}
+          className="bg-gray-700 text-white rounded p-2 col-span-2"
+        >
+          Back
+        </button>
+      </div>
+    )}
+
+    {playBuilder.step === "hitLocation" && (
+      <div className="grid grid-cols-3 gap-2 text-xs">
+        <p className="col-span-3 font-semibold text-center">
+          Select Location
+        </p>
+
+        {fieldLocations.map((location) => (
+          <button
+            key={location.value}
+            onClick={() =>
+              finalizeHitLocation(
+                playBuilder.hitKind,
+                playBuilder.contactType,
+                location.value
+              )
+            }
+            className="bg-green-600 text-white rounded p-2"
+          >
+            {location.label}
+          </button>
+        ))}
+
+        <button
+          onClick={() =>
+            setPlayBuilder({
+              step: "hitContact",
+              hitKind: playBuilder.hitKind,
+            })
+          }
           className="bg-gray-700 text-white rounded p-2 col-span-3"
         >
           Back

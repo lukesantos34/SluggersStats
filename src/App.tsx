@@ -1,16 +1,17 @@
 // App.tsx - Main React component for the SluggerStats application
 import { useState } from "react"
 import { createInitialGameState } from "./engine/createInitialGameState"
-import { applyPlay, applyResolvedPlay } from "./engine/applyPlay"
+import { applyResolvedPlay } from "./engine/applyPlay"
 import {
   buildBasicHitPlay,
   buildBasicOutPlay,
+  buildHomeRunPlay,
+  buildWalkOrHbpPlay,
 } from "./engine/buildResolvedPlay"
 import type {
   ContactType,
   FieldLocation,
   ResolvedPlay,
-  PlayResult,
 } from "./engine/types"
 
 export default function App() {
@@ -38,6 +39,8 @@ export default function App() {
   type HitKind = "single" | "double" | "triple" | "inside_the_park_home_run"
   type ContactKind = ContactType
   type OutKind = "groundout" | "lineout" | "flyout" | "popout" | "bunt_out"
+  type HomeRunDirection = "left" | "center" | "right"
+  type WalkKind = "walk" | "hit_by_pitch"
 
   type PlayBuilder =
     | { step: "root" }
@@ -83,17 +86,6 @@ export default function App() {
   const [playBuilder, setPlayBuilder] = useState<PlayBuilder>({
     step: "root",
   })
-
-  function handlePlay(result: PlayResult) {
-    setHistory((prev) => [...prev, gameState])
-    const newState = applyPlay(gameState, result)
-    setGameState(newState)
-  }
-
-  function applyAndReset(result: PlayResult) {
-    handlePlay(result)
-    setPlayBuilder({ step: "root" })
-  }
 
   function applyResolvedAndReset(play: ResolvedPlay) {
     setHistory((prev) => [...prev, gameState])
@@ -144,8 +136,20 @@ export default function App() {
     applyResolvedAndReset(play)
   }
 
-  function finalizeHomeRun() {
-    applyAndReset({ type: "homerun" })
+  function finalizeHomeRun(direction: HomeRunDirection) {
+    const play = buildHomeRunPlay(gameState, {
+      direction,
+    })
+
+    applyResolvedAndReset(play)
+  }
+
+  function finalizeWalkOrHbp(result: WalkKind) {
+    const play = buildWalkOrHbpPlay(gameState, {
+      result,
+    })
+
+    applyResolvedAndReset(play)
   }
 
   function handleComingSoon(feature: string) {
@@ -511,21 +515,21 @@ export default function App() {
     {playBuilder.step === "homeRunDirection" && (
       <div className="grid grid-cols-3 gap-2 text-xs">
         <button
-          onClick={finalizeHomeRun}
+          onClick={() => finalizeHomeRun("left")}
           className="bg-green-800 text-white rounded p-3 font-semibold"
         >
           Left
         </button>
 
         <button
-          onClick={finalizeHomeRun}
+          onClick={() => finalizeHomeRun("center")}
           className="bg-green-800 text-white rounded p-3 font-semibold"
         >
           Center
         </button>
 
         <button
-          onClick={finalizeHomeRun}
+          onClick={() => finalizeHomeRun("right")}
           className="bg-green-800 text-white rounded p-3 font-semibold"
         >
           Right
@@ -543,14 +547,14 @@ export default function App() {
     {playBuilder.step === "walkType" && (
       <div className="grid grid-cols-2 gap-2 text-xs">
         <button
-          onClick={() => applyAndReset({ type: "walk" })}
+          onClick={() => finalizeWalkOrHbp("walk")}
           className="bg-blue-500 text-white rounded p-3 font-semibold"
         >
           4 Balls
         </button>
 
         <button
-          onClick={() => handleComingSoon("Hit by pitch")}
+          onClick={() => finalizeWalkOrHbp("hit_by_pitch")}
           className="bg-blue-700 text-white rounded p-3 font-semibold"
         >
           Hit By Pitch
